@@ -6,6 +6,10 @@
             "email": "contact@spomky-labs.com"
         }
     ],
+    "bin": [
+        "bin/beaver.phar",
+        "bin/beaver.x86_64"
+    ],
     "require-dev": {
         "php": ">8.1",
         "jolicode/castor": "^0.18.3",
