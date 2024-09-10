@@ -4,20 +4,22 @@ declare(strict_types=1);
 
 use Castor\Attribute\AsRawTokens;
 use Castor\Attribute\AsTask;
+use function Castor\context;
 use function Castor\io;
 use function Castor\notify;
 use function Castor\run;
 
-#[AsTask(description: 'Run mutation testing')]
+#[AsTask(description: 'Run mutation testing.')]
 function infect(int $minMsi = 0, int $minCoveredMsi = 0, bool $ci = false): void
 {
     io()->title('Running infection');
-    $nproc = run('nproc', quiet: true);
+    $nproc = run('nproc', context: context()->withQuiet());
     if (! $nproc->isSuccessful()) {
-        io()->error('Cannot determine the number of processors');
-        return;
+        io()->warning('Cannot determine the number of processors. Setting 1 thread.');
+        $threads = '1';
+    } else {
+        $threads = (int) $nproc->getOutput();
     }
-    $threads = (int) $nproc->getOutput();
     $command = [
         'php',
         'vendor/bin/infection',
@@ -29,49 +31,56 @@ function infect(int $minMsi = 0, int $minCoveredMsi = 0, bool $ci = false): void
         $command[] = '--logger-github';
         $command[] = '-s';
     }
-    $environment = [
+    $context = context();
+    $context->withEnvironment([
         'XDEBUG_MODE' => 'coverage',
-    ];
-    run($command, environment: $environment);
+    ]);
+    run($command, context: $context);
 }
 
-#[AsTask(description: 'Run tests')]
+#[AsTask(description: 'Run PHPUnit tests.')]
 function test(bool $coverageHtml = false, bool $coverageText = false, null|string $group = null): void
 {
     io()->title('Running tests');
     $command = ['php', 'vendor/bin/phpunit', '--color'];
-    $environment = [
+    $context = context();
+    $context->withEnvironment([
         'XDEBUG_MODE' => 'off',
-    ];
+    ]);
     if ($coverageHtml) {
         $command[] = '--coverage-html=build/coverage';
-        $environment['XDEBUG_MODE'] = 'coverage';
+        $context->withEnvironment([
+            'XDEBUG_MODE' => 'coverage',
+        ]);
     }
     if ($coverageText) {
         $command[] = '--coverage-text';
-        $environment['XDEBUG_MODE'] = 'coverage';
+        $context->withEnvironment([
+            'XDEBUG_MODE' => 'coverage',
+        ]);
     }
     if ($group !== null) {
         $command[] = sprintf('--group=%s', $group);
     }
-    run($command, environment: $environment);
+    run($command, context: $context);
 }
 
-#[AsTask(description: 'Coding standards check')]
+#[AsTask(description: 'Coding standards check.')]
 function cs(bool $fix = false): void
 {
     io()->title('Running coding standards check');
     $command = ['php', 'vendor/bin/ecs', 'check'];
-    $environment = [
+    $context = context();
+    $context->withEnvironment([
         'XDEBUG_MODE' => 'off',
-    ];
+    ]);
     if ($fix) {
         $command[] = '--fix';
     }
-    run($command, environment: $environment);
+    run($command, context: $context);
 }
 
-#[AsTask(description: 'Running PHPStan')]
+#[AsTask(description: 'Running PHPStan.')]
 function stan(bool $baseline = false): void
 {
     io()->title('Running PHPStan');
@@ -80,40 +89,44 @@ function stan(bool $baseline = false): void
         $options[] = '--generate-baseline';
     }
     $command = ['php', 'vendor/bin/phpstan', ...$options];
-    $environment = [
+    $context = context();
+    $context->withEnvironment([
         'XDEBUG_MODE' => 'off',
-    ];
-    run($command, environment: $environment);
+    ]);
+    run($command, context: $context);
 }
 
-#[AsTask(description: 'Validate Composer configuration')]
+#[AsTask(description: 'Validate Composer configuration.')]
 function validate(): void
 {
     io()->title('Validating Composer configuration');
     $command = ['composer', 'validate', '--strict'];
-    $environment = [
+    $context = context();
+    $context->withEnvironment([
         'XDEBUG_MODE' => 'off',
-    ];
-    run($command, environment: $environment);
+    ]);
+    run($command, context: $context);
 
     $command = ['composer', 'dump-autoload', '--optimize', '--strict-psr'];
-    run($command, environment: $environment);
+    run($command, context: $context);
 }
 
 /**
  * @param array<string> $allowedLicenses
  */
-#[AsTask(description: 'Check licenses')]
+#[AsTask(description: 'Check licenses.')]
 function checkLicenses(
     array $allowedLicenses = ['Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', 'MIT', 'MPL-2.0', 'OSL-3.0']
 ): void {
     io()->title('Checking licenses');
     $allowedExceptions = [];
     $command = ['composer', 'licenses', '-f', 'json'];
-    $environment = [
+    $context = context();
+    $context->withEnvironment([
         'XDEBUG_MODE' => 'off',
-    ];
-    $result = run($command, environment: $environment, quiet: true);
+    ]);
+    $context->withQuiet();
+    $result = run($command, context: $context);
     if (! $result->isSuccessful()) {
         io()->error('Cannot determine licenses');
         exit(1);
@@ -158,7 +171,7 @@ function checkLicenses(
         ->success('All licenses are allowed');
 }
 
-#[AsTask(description: 'Run Rector')]
+#[AsTask(description: 'Run Rector to upgrade code.')]
 function rector(bool $fix = false): void
 {
     io()->title('Running Rector');
@@ -166,31 +179,33 @@ function rector(bool $fix = false): void
     if (! $fix) {
         $command[] = '--dry-run';
     }
-    $environment = [
+    $context = context();
+    $context->withEnvironment([
         'XDEBUG_MODE' => 'off',
-    ];
-    run($command, environment: $environment);
+    ]);
+    run($command, context: $context);
 }
 
-#[AsTask(description: 'Run Rector')]
+#[AsTask(description: 'Run Deptrac to analyze dependencies.')]
 function deptrac(): void
 {
     io()->title('Running Rector');
     $command = ['php', 'vendor/bin/deptrac', 'analyse', '--fail-on-uncovered', '--no-cache'];
-    $environment = [
+    $context = context();
+    $context->withEnvironment([
         'XDEBUG_MODE' => 'off',
-    ];
-    run($command, environment: $environment);
+    ]);
+    run($command, context: $context);
 }
 
-#[AsTask(description: 'Restart the containers')]
+#[AsTask(description: 'Restart the containers.')]
 function restart(): void
 {
     stop();
     start();
 }
 
-#[AsTask(description: 'Clean the infrastructure (remove container, volume, networks)')]
+#[AsTask(description: 'Clean the infrastructure (remove container, volume, networks).')]
 function destroy(bool $force = false): void
 {
     if (! $force) {
@@ -231,54 +246,60 @@ function build(): void
 #[AsTask(description: 'Compile the frontend.')]
 function frontend(bool $watch = false): void
 {
-    php(['bin/console', 'assets:install']);
-    php(['bin/console', 'app:browscap:update']);
-    run(['yarn', 'install']);
-    if ($watch) {
-        run(['yarn', 'watch']);
-    } else {
-        run(['yarn', 'build']);
+    $consoleOutput = run(['bin/console'], context: context()->withQuiet());
+    $commandsToRun = [
+        'assets:install' => [],
+        'importmap:install' => [],
+        'tailwind:build' => $watch ?['--watch'] : [],
+        'asset-map:compile' => [],
+    ];
+
+    foreach ($commandsToRun as $command => $arguments) {
+        if (str_contains($consoleOutput->getOutput(), $command)) {
+            php(['bin/console', $command, ...$arguments]);
+        }
     }
-    //php(['bin/console', 'importmap:install']);
-
-    //$arguments=['bin/console', 'tailwind:build'];
-    //if ($watch) {
-    //    $arguments[] = '--watch';
-    //}
-
-    //php($arguments);
-    //php(['bin/console', 'asset-map:compile']);
+    if (file_exists('yarn.lock')) {
+        run(['yarn', 'install']);
+        run(['yarn', $watch ? 'watch' : 'build']);
+    }
 }
 
 #[AsTask(description: 'Update the dependencies and other features.')]
 function update(): void
 {
     run(['composer', 'update']);
-    php(['bin/console', 'geoip2:update']);
-    php(['bin/console', 'app:browscap:update']);
-    //php(['bin/console', 'importmap:update']);
+    $consoleOutput = run(['bin/console'], context: context()->withQuiet());
+    $commandsToRun = [
+        'doctrine:migrations:migrate' => [],
+        'doctrine:schema:validate' => [],
+        'doctrine:fixtures:load' => [],
+        'geoip2:update' => [],
+        'app:browscap:update' => [],
+        'importmap:update' => [],
+    ];
+
+    foreach ($commandsToRun as $command => $arguments) {
+        if (str_contains($consoleOutput->getOutput(), $command)) {
+            php(['bin/console', $command, ...$arguments]);
+        }
+    }
 }
 
-#[AsTask(description: 'Runs a Consumer.')]
+#[AsTask(description: 'Runs a Consumer from the Docket Container.')]
 function consume(): void
 {
     php(['bin/console', 'messenger:consume', '--all']);
 }
 
-#[AsTask(description: 'Runs a console command.', ignoreValidationErrors: true)]
+#[AsTask(description: 'Runs a Symfony Console command from the Docket Container.', ignoreValidationErrors: true)]
 function console(#[AsRawTokens] array $args = []): void
 {
     php(['bin/console', ...$args]);
 }
 
-#[AsTask(description: 'Runs a PHP command.', ignoreValidationErrors: true)]
+#[AsTask(description: 'Runs a PHP command from the Docket Container.', ignoreValidationErrors: true)]
 function php(#[AsRawTokens] array $args = []): void
 {
     run(['docker', 'compose', 'exec', '-T', 'php', ...$args]);
-}
-
-#[AsTask(description: 'Update symbols.')]
-function updateSymbols(): void
-{
-    php(['bin/console', 'app:eod:update-symbols']);
 }
