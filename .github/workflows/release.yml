@@ -29,22 +29,16 @@ jobs:
           coverage: none
           ini-values: memory_limit=1G, phar.readonly=0
 
-      - name: 'Setup Composer Token'
-        run: |
-          if [ ! -z '${{ secrets.COMPOSER_TOKEN }}' ]; then
-            composer config github-oauth.github.com ${{ secrets.COMPOSER_TOKEN }}
-          fi
+      - name: 'Install Project Dependencies'
+        run: composer install --no-interaction --no-ansi --no-progress
 
-      - name: 'Compile the application (Linux)'
+      - name: 'Compile the application'
         run: |
           vendor/bin/castor repack --os={{ matrix.os }} --app-name=beaver --app-version=${{ github.ref_name }}
           vendor/bin/castor compile beaver.linux.phar --php-version=${{ matrix.php }} --arch={{ matrix.arch }} --os={{ matrix.os }}
 
       - name: 'Move applications'
         run: mv beaver.* ./bin/
-
-      - name: 'Install Project Dependencies'
-        run: composer install --no-interaction --no-ansi --no-progress
 
       - name: 'Create Release'
         uses: ncipollo/release-action@v1
