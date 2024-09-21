@@ -32,36 +32,21 @@ function infect(int $minMsi = 0, int $minCoveredMsi = 0, bool $ci = false): void
         $command[] = '-s';
     }
     $context = context();
-    $context->withEnvironment([
+    $context = $context->withEnvironment([
         'XDEBUG_MODE' => 'coverage',
     ]);
     run($command, context: $context);
 }
 
-#[AsTask(description: 'Run PHPUnit tests.')]
-function test(bool $coverageHtml = false, bool $coverageText = false, null|string $group = null): void
+#[AsTask(description: 'Run PHPUnit tests.', ignoreValidationErrors: true)]
+function test(#[AsRawTokens] array $args = []): void
 {
     io()->title('Running tests');
-    $command = ['php', 'vendor/bin/phpunit', '--color'];
+    $command = ['php', 'vendor/bin/phpunit', ...$args];
     $context = context();
-    $context->withEnvironment([
-        'XDEBUG_MODE' => 'off',
+    $context = $context->withEnvironment([
+        'XDEBUG_MODE' => 'coverage',
     ]);
-    if ($coverageHtml) {
-        $command[] = '--coverage-html=build/coverage';
-        $context->withEnvironment([
-            'XDEBUG_MODE' => 'coverage',
-        ]);
-    }
-    if ($coverageText) {
-        $command[] = '--coverage-text';
-        $context->withEnvironment([
-            'XDEBUG_MODE' => 'coverage',
-        ]);
-    }
-    if ($group !== null) {
-        $command[] = sprintf('--group=%s', $group);
-    }
     run($command, context: $context);
 }
 
@@ -71,7 +56,7 @@ function cs(bool $fix = false): void
     io()->title('Running coding standards check');
     $command = ['php', 'vendor/bin/ecs', 'check'];
     $context = context();
-    $context->withEnvironment([
+    $context = $context->withEnvironment([
         'XDEBUG_MODE' => 'off',
     ]);
     if ($fix) {
@@ -90,7 +75,7 @@ function stan(bool $baseline = false): void
     }
     $command = ['php', 'vendor/bin/phpstan', ...$options];
     $context = context();
-    $context->withEnvironment([
+    $context = $context->withEnvironment([
         'XDEBUG_MODE' => 'off',
     ]);
     run($command, context: $context);
@@ -102,7 +87,7 @@ function validate(): void
     io()->title('Validating Composer configuration');
     $command = ['composer', 'validate', '--strict'];
     $context = context();
-    $context->withEnvironment([
+    $context = $context->withEnvironment([
         'XDEBUG_MODE' => 'off',
     ]);
     run($command, context: $context);
@@ -122,10 +107,10 @@ function checkLicenses(
     $allowedExceptions = [];
     $command = ['composer', 'licenses', '-f', 'json'];
     $context = context();
-    $context->withEnvironment([
+    $context = $context->withEnvironment([
         'XDEBUG_MODE' => 'off',
     ]);
-    $context->withQuiet();
+    $context = $context->withQuiet();
     $result = run($command, context: $context);
     if (! $result->isSuccessful()) {
         io()->error('Cannot determine licenses');
@@ -180,7 +165,7 @@ function rector(bool $fix = false): void
         $command[] = '--dry-run';
     }
     $context = context();
-    $context->withEnvironment([
+    $context = $context->withEnvironment([
         'XDEBUG_MODE' => 'off',
     ]);
     run($command, context: $context);
@@ -192,7 +177,7 @@ function deptrac(): void
     io()->title('Running Rector');
     $command = ['php', 'vendor/bin/deptrac', 'analyse', '--fail-on-uncovered', '--no-cache'];
     $context = context();
-    $context->withEnvironment([
+    $context = $context->withEnvironment([
         'XDEBUG_MODE' => 'off',
     ]);
     run($command, context: $context);
