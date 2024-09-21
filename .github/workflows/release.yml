@@ -15,7 +15,7 @@ jobs:
       matrix:
         php: ['8.3']
         arch: ['x86_64']
-        os: ['linux']
+        system: ['linux']
 
     steps:
       - name: 'Checkout Code'
@@ -34,8 +34,8 @@ jobs:
 
       - name: 'Compile the application'
         run: |
-          vendor/bin/castor repack --os={{ matrix.os }} --app-name=beaver --app-version=${{ github.ref_name }}
-          vendor/bin/castor compile beaver.linux.phar --php-version=${{ matrix.php }} --arch={{ matrix.arch }} --os={{ matrix.os }}
+          vendor/bin/castor repack --os=${{ matrix.system }} --app-name=beaver --app-version=${{ github.ref_name }}
+          vendor/bin/castor compile beaver.linux.phar --php-version=${{ matrix.php }} --arch=${{ matrix.arch }} --os=${{ matrix.system }}
 
       - name: 'Move applications'
         run: mv beaver.* ./bin/
